@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HORIZIA Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>  
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
+  <style>
+    /* keep your existing CSS unchanged */
+  </style>
+</head>
+<body>
+  <!-- LANDING PAGE -->
+  <div id="landingPage">
+    <div class="landing-header">
+      <div class="landing-logo">
+        <img src="HORIZIA1.png" alt="HORIZIA Logo" />
+      </div>
+      <button class="get-started-btn" onclick="showLoginPage()">Get Started</button>
+    </div>
+    <div class="landing-main">
+      <h2 style="margin-bottom:12px; color:var(--accent);">The Next-Gen Team Collaboration Dashboard</h2>
+    </div>
+    <div class="landing-footer">
+      <span>© 2025 HORIZIA</span>
+    </div>
+  </div>
+
+  <!-- LOGIN PAGE -->
+  <div id="loginPage" style="display:none;">
+    <div class="login-box">
+      <h3 style="margin:0 0 10px 0; color:var(--accent)">HORIZIA — Sign in</h3>
+      <input id="inpEmail" class="input" placeholder="Email" type="email" />
+      <input id="inpPass" type="password" class="input" placeholder="Password" />
+      <select id="inpRole" class="input">
+        <option>Product Owner</option>
+        <option>Team Lead</option>
+        <option>Project Manager</option>
+        <option>Engineering Manager</option>
+        <option>Admin</option>
+      </select>
+      <button style="width:100%" onclick="doLogin()">Sign in</button>
+      <button style="width:100%; margin-top:8px;" onclick="doRegister()">Register</button>
+      <button class="ghost" style="margin: 10px auto 0 auto; display: block" onclick="goToLanding()">Back to Landing</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none;">
+    <header>
+      <div style="display:flex; gap:12px; align-items:center">
+        <img src="HORIZIA1.png" alt="logo" />
+        <h1>Collaboration Dashboard</h1>
+        <div class="datetime" id="datetime"></div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center">
+        <div id="userRole" style="font-size:13px; font-weight:700"></div>
+        <button class="ghost" onclick="openModal('users')" id="userMgmtBtn">User Management</button>
+        <button onclick="logout()">Logout</button>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="body-actions" id="bodyActions">
+        <button class="ghost" onclick="openModal('roadmap')">Delivery Roadmap</button>
+        <button class="ghost" onclick="openModal('dependencies')">Cross-team Map</button>
+        <button class="ghost" onclick="openModal('blockers')">Blockers Heatmap</button>
+        <button class="ghost" onclick="openModal('risks')">Risk Alerts</button>
+      </div>
+    </div>
+    <footer>
+      <p>© 2025 HORIZIA — Team Collaboration Dashboard</p>
+    </footer>
+  </div>
+
+  <!-- -------------------- SCRIPT -------------------- -->
+  <script>
+    // ---------------------- FIREBASE INIT ----------------------
+    const firebaseConfig = {
+      apiKey: "AIzaSyD4HY2aDRhuWrhTnhlvOIP5_lLRXUKLk4Q",
+      authDomain: "horizia-9334b.firebaseapp.com",
+      projectId: "horizia-9334b",
+      storageBucket: "horizia-9334b.firebasestorage.app",
+      messagingSenderId: "133096909231",
+      appId: "1:133096909231:web:5e2f20b31799f7e275675a"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const db = firebase.firestore();
+
+    // ---------------------- REGISTER ----------------------
+    async function doRegister() {
+      const email = document.getElementById("inpEmail").value.trim();
+      const password = document.getElementById("inpPass").value;
+      const role = document.getElementById("inpRole").value;
+
+      try {
+        const userCred = await auth.createUserWithEmailAndPassword(email, password);
+        await db.collection("users").doc(userCred.user.uid).set({
+          email,
+          role
+        });
+        alert("Registered successfully!");
+      } catch (err) {
+        alert("Error: " + err.message);
+      }
+    }
+
+    // ---------------------- LOGIN ----------------------
+    async function doLogin() {
+      const email = document.getElementById("inpEmail").value.trim();
+      const password = document.getElementById("inpPass").value;
+
+      try {
+        const userCred = await auth.signInWithEmailAndPassword(email, password);
+        const doc = await db.collection("users").doc(userCred.user.uid).get();
+        if (!doc.exists) {
+          alert("No role found for this user.");
+          return;
+        }
+        const userData = { uid: userCred.user.uid, email, role: doc.data().role };
+        localStorage.setItem("horizia_current_user", JSON.stringify(userData));
+        showDashboard();
+      } catch (err) {
+        alert("Login failed: " + err.message);
+      }
+    }
+
+    // ---------------------- LOGOUT ----------------------
+    async function logout() {
+      await auth.signOut();
+      localStorage.removeItem("horizia_current_user");
+      hideAllMainScreens();
+      showLandingPage();
+    }
+
+    function getCurrentUser() {
+      return JSON.parse(localStorage.getItem("horizia_current_user") || "null");
+    }
+
+    // ---------------------- DASHBOARD ----------------------
+    function showDashboard() {
+      hideAllMainScreens();
+      document.getElementById("dashboard").style.display = "block";
+      const user = getCurrentUser();
+      if (!user) return showLandingPage();
+      document.getElementById("userRole").textContent = `${user.email} — ${user.role}`;
+
+      // Admin can always see User Management
+      document.getElementById("userMgmtBtn").style.display = user.role === "Admin" ? "inline-block" : "none";
+    }
+
+    // ---------------------- SCREEN HELPERS ----------------------
+    function hideAllMainScreens() {
+      document.getElementById("landingPage").style.display = "none";
+      document.getElementById("loginPage").style.display = "none";
+      document.getElementById("dashboard").style.display = "none";
+    }
+    function showLoginPage(){ hideAllMainScreens(); document.getElementById("loginPage").style.display="flex"; }
+    function goToLanding(){ hideAllMainScreens(); showLandingPage(); }
+    function showLandingPage(){ hideAllMainScreens(); document.getElementById("landingPage").style.display="flex"; }
+
+    // ---------------------- DATETIME ----------------------
+    function updateDateTime(){ 
+      const now=new Date(); 
+      const opts={weekday:'short',year:'numeric',month:'short',day:'numeric'}; 
+      document.querySelectorAll('.datetime').forEach(el=>el.textContent = now.toLocaleDateString(undefined,opts)+' | '+now.toLocaleTimeString()); 
+    }
+    setInterval(updateDateTime,1000);
+
+    // On load
+    document.addEventListener("DOMContentLoaded", () => {
+      updateDateTime();
+      if(getCurrentUser()){ showDashboard(); } else { showLandingPage(); }
+    });
+  </script>
+</body>
+</html>
